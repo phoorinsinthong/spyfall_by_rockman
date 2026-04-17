@@ -540,3 +540,78 @@ h1, h2, h3, h4 {
 }
 .btn-leave-no:hover { background: #e2e8f0; }
 
+/* Spy Reveal Button (Danger) */
+.pushable-danger { background: #dc2626; border-radius: 99px; padding: 0; border: none; cursor: pointer; width: 100%; font-family: inherit; transition: filter 250ms; }
+.front-danger {
+  display: block; padding: 14px 24px; border-radius: 99px;
+  font-size: 1.1rem; font-weight: 700;
+  background: linear-gradient(135deg, #fb923c, #ef4444);
+  color: white; border: 2px solid rgba(255,255,255,0.4);
+  transform: translateY(-6px);
+  transition: transform 250ms cubic-bezier(.3, .7, .4, 1);
+}
+.pushable-danger:hover { filter: brightness(110%); }
+.pushable-danger:hover .front-danger { transform: translateY(-8px); }
+.pushable-danger:active .front-danger { transform: translateY(-2px); }
+
+/* Spy Reveal Modal */
+.spy-modal { border-top: 6px solid #ef4444; }
+.spy-reveal-anim { font-size: 3.5rem; animation: spySpin 1s ease-in-out; }
+.spy-reveal-title { color: #ef4444; font-size: 1.4rem; }
+.spy-reveal-name { color: #1e293b; font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; background:#fef2f2; padding: 8px 12px; border-radius: 12px; }
+
+/* Spy Revealing Banner */
+.spy-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+  background: linear-gradient(135deg, #fb923c, #ef4444);
+  color: white; font-weight: 700; font-size: 1rem;
+  text-align: center; padding: 12px 1rem;
+  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 16px rgba(239,68,68,0.4);
+}
+
+@keyframes spySpin { 0% { transform: scale(0) rotate(-180deg); } 100% { transform: scale(1) rotate(0deg); } }
+@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+/* Kick Button */
+.kick-btn {
+  background: #fee2e2;
+  border: 2px solid #fca5a5;
+  color: #ef4444;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+  width: auto;
+  transition: all 0.15s;
+}
+.kick-btn:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+  transform: scale(1.08);
+}
+
+/* Kicked Toast */
+.kicked-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #fb923c, #ef4444);
+  color: white;
+  font-family: 'Kanit', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 14px 28px;
+  border-radius: 99px;
+  box-shadow: 0 8px 24px rgba(239,68,68,0.4);
+  z-index: 9999;
+  white-space: nowrap;
+  animation: toastPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), toastFade 0.5s 3s ease forwards;
+}
+@keyframes toastPop { from { transform: translateX(-50%) scale(0.8); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+@keyframes toastFade { from { opacity: 1; } to { opacity: 0; } }
+
