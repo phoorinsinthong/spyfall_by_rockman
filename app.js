@@ -38,7 +38,19 @@ const DEFAULT_LOCATIONS = {
   'สิ่งขนส่งสาธารณะ (BTS)': ['คนไม่ยอมขยับเข้าไป', 'นักเรียนแย่งที่นั่ง', 'คนฟังเพลงเสียงดัง', 'คนสวมหน้ากากมิดชิด', 'พ่อค้าขายของในรถไฟ', 'ตำรวจตรวจตั๋ว'],
   'ตลาดนัดกลางคืน (Jodd Fair)': ['คนขายของวินเทจ', 'อินฟลูเอนเซอร์ถ่ายคอนเทนต์', 'คนหาที่จอดรถ 1 ชั่วโมง', 'พ่อครัวสตรีทฟู้ด', 'ดีเจเปิดเพลง', 'นักท่องเที่ยวต่างชาติ'],
   'สปา / อ่างน้ำร้อน': ['แพทย์ทางเลือก', 'ลูกค้าเครียดสุดๆ', 'พนักงานเจ้าของนิ้ว', 'คนหลับตลอด 2 ชั่วโมง', 'เซลล์ขายแพ็คเกจ', 'คนแพ้น้ำมันหอม'],
+  // 10 สถานที่ใหม่กวนๆ
+  'ห้องน้ำสาธารณะ': ['คนเคาะประตูถี่มาก', 'คนกระดาษหมดพอดี', 'แม่บ้านถือไม้ม็อปจ้อง', 'คนโทรคุยในห้องน้ำ', 'คนลืมรูดซิป'],
+  'งานแต่งงาน': ['เจ้าบ่าวตื่นเต้นจนเป็นลม', 'เจ้าสาวไม่มา', 'แขกกินบุฟเฟ่ต์ยกที่', 'DJ เปิดเพลงผิด', 'ป้าถ่ายรูปขวางช่างภาพ', 'แฟนเก่าแอบมา'],
+  'ร้านตัดผม': ['ช่างตัดผมมือสั่น', 'ลูกค้าโชว์รูปดาราแล้วผิดหวัง', 'เด็กร้องไห้ไม่ยอมตัด', 'คนรอนานจนหลับ', 'ช่างโกนหนวดหน้าตาเฉย', 'ลูกค้าบ่นไม่หยุด'],
+  'ห้องสอบ': ['นักเรียนลอกข้างๆ', 'อาจารย์คุมสอบง่วงนอน', 'คนเขียนจนหมดหน้ากระดาษ', 'คนส่งข้อสอบแล้วเดินออกมาดีใจ', 'คนลืมดินสอ', 'นักเรียนนั่งสั่นขาตลอด'],
+  'รถเมล์ตีห้า': ['คนขับแข่งกับเวลา', 'ป้าแม่ค้าตะกร้าเต็มคัน', 'ลูกจ้างง่วงจนหัวทิ่ม', 'คนนับเหรียญค่าโดยสาร', 'กระเป๋ารถด่าทอด', 'คนวิ่งตามรถไม่ทัน'],
+  'ร้านขายยา': ['เภสัชกรถามซักประวัติยาว', 'ลูกค้าซื้อยาตามติ๊กต๊อก', 'คนซื้อถุงยางตาขวาง', 'คนมาขอยาแก้เมาค้าง', 'ลูกค้าแย้งว่าหมอสั่งผิด', 'คนซื้อวิตามินทั้งร้าน'],
+  'ค่ายดาวเทียม (Camp)': ['ผู้นำค่ายสุดฮาร์ดคอร์', 'น้องใหม่ร้องไห้คิดถึงบ้าน', 'คนกลัวแมลง', 'คืนแรกนอนไม่หลับ', 'แม่ทัพทีมเชียร์', 'คนแอบเอาโทรศัพท์มา'],
+  'ห้อง ICU': ['หมอทำหน้าตรึง', 'พยาบาลวิ่งทุก 5 นาที', 'ญาติร้องไห้หน้าห้อง', 'เครื่องบีบหัวใจดังตลอด', 'คนไข้แอบดูฟีด IG', 'นักศึกษาแพทย์ฝึกงาน'],
+  'ปาร์ตี้วันเกิด': ['เจ้าของวันเกิดร้องไห้โดนเซอร์ไพรส์', 'คนตัดเค้กแบ่งผิด', 'แขกที่ไม่ได้รับเชิญแต่มาเอง', 'คนเหล้าหมดก่อนทุกคน', 'ดีเจเปิดเพลงสปีดเร็วผิดงาน', 'คนถ่ายรูปแต่ไม่กิน'],
+  'ราชวัง / พระบรมมหาราชวัง': ['นักท่องเที่ยวไม่รู้กฎการแต่งกาย', 'ไกด์เล่าประวัติศาสตร์ไม่หยุด', 'เจ้าหน้าที่ยืนนิ่งเหมือนหุ่น', 'คนแอบถ่ายรูปในเขตห้าม', 'แฟชั่นนิสต้าใส่ชุดสั้น', 'พระราชวงศ์เสด็จ'],
 };
+
 
 let STATE = {
   playerName: '',
@@ -78,7 +90,7 @@ function switchSubView(status) {
 // Host UI toggles
 document.getElementById('location-pack-select').addEventListener('change', (e) => {
   const customUi = document.getElementById('custom-locations-container');
-  if(e.target.value === 'custom') customUi.classList.remove('hidden');
+  if (e.target.value === 'custom') customUi.classList.remove('hidden');
   else customUi.classList.add('hidden');
 });
 
@@ -86,9 +98,9 @@ document.getElementById('location-pack-select').addEventListener('change', (e) =
 document.getElementById('btn-create-room').addEventListener('click', async () => {
   const name = document.getElementById('player-name').value.trim();
   if (!name) { homeError.innerText = "กรุณากรอกชื่อของคุณ"; homeError.classList.remove('hidden'); return; }
-  
+
   STATE.playerName = name; STATE.playerId = generateId(); STATE.roomId = generateRoomCode(); STATE.isHost = true;
-  
+
   const roomRef = ref(db, `rooms/${STATE.roomId}`);
   const initialRoom = {
     status: 'LOBBY', host: STATE.playerId, targetLocation: '', winner: '', allLocations: [],
@@ -161,7 +173,7 @@ function renderRoom(data) {
   if (me.kicked) {
     return; // wait for the remove to come through
   }
-  
+
   STATE.isHost = (data.host === STATE.playerId);
   document.getElementById('room-state-title').innerText = data.status === 'LOBBY' ? 'ล็อบบี้รอกดพร้อม' : data.status === 'PLAYING' ? 'กำลังเล่นเผ็ดมันส์' : data.status === 'VOTING' ? 'ช่วงเวลาโหวต!' : 'จบเกมแล้ว';
   switchSubView(data.status);
@@ -182,7 +194,7 @@ function renderRoom(data) {
           ? `🚀 เริ่มเกม (ต้องมี 3 คน+)`
           : `⏳ รอ ${totalCount - readyCount} คน กดพร้อม...`;
     } else hostControls.classList.add('hidden');
-    
+
     document.getElementById('player-list').innerHTML = playerIds.map(id => `
       <div class="player-item">
         <span>${players[id].name} ${id === data.host ? '👑' : ''}</span>
@@ -197,7 +209,7 @@ function renderRoom(data) {
   if (data.status === 'PLAYING') {
     document.getElementById('display-role').innerText = `บทบาท: ${me.role}`;
     let isSpyOrAccomplice = me.role === 'สายลับ' || me.role === 'ผู้สมรู้ร่วมคิด';
-    
+
     if (me.role === 'ผู้สมรู้ร่วมคิด') {
       let spyName = Object.values(players).find(p => p.role === 'สายลับ')?.name;
       document.getElementById('display-location').innerText = `สายลับคือ: ${spyName}`;
@@ -235,7 +247,7 @@ function renderRoom(data) {
   if (data.status === 'FINISHED') {
     let winnerText = data.winner === 'Spy' ? 'สายลับ 🎉' : 'ชาวบ้าน 🏘️';
     document.getElementById('display-winner').innerText = `ผู้ชนะ: ${winnerText}`;
-    let spyName = Object.values(players).find(p=>p.role==='สายลับ')?.name;
+    let spyName = Object.values(players).find(p => p.role === 'สายลับ')?.name;
     document.getElementById('display-spy-name').innerText = `สายลับคือ: ${spyName}`;
     document.getElementById('display-true-location').innerText = `สถานที่จริงคือ: ${data.targetLocation}`;
     if (STATE.isHost) document.getElementById('btn-back-home').classList.remove('hidden');
@@ -263,7 +275,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   if (packType === 'custom') {
     const raw = document.getElementById('custom-locations-input').value;
     pool = raw.split(',').map(s => s.trim()).filter(s => s);
-    if(pool.length < 3) pool = Object.keys(DEFAULT_LOCATIONS);
+    if (pool.length < 3) pool = Object.keys(DEFAULT_LOCATIONS);
   } else {
     pool = Object.keys(DEFAULT_LOCATIONS);
   }
@@ -276,17 +288,17 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   let shuffledIds = ids.sort(() => 0.5 - Math.random());
   const spyId = shuffledIds[0];
   let accompliceId = null;
-  
+
   if (enableSpecial && ids.length >= 4) {
     accompliceId = shuffledIds[1];
   }
 
   let updates = { targetLocation: targetLoc, status: 'PLAYING', timerEnd: Date.now() + (8 * 60 * 1000), winner: '', chat: {}, allLocations: pool };
-  
+
   ids.forEach(id => {
     updates[`players/${id}/votedFor`] = '';
     updates[`players/${id}/isReady`] = false;
-    
+
     if (id === spyId) {
       updates[`players/${id}/role`] = 'สายลับ';
       updates[`players/${id}/location`] = '';
@@ -337,12 +349,12 @@ document.getElementById('btn-leave-cancel').addEventListener('click', () => {
 document.getElementById('btn-leave-confirm').addEventListener('click', doLeaveRoom);
 
 
-window.selectVote = function(targetId) {
+window.selectVote = function (targetId) {
   if (STATE.roomData.status !== 'VOTING') return;
   STATE.voteTarget = targetId; renderRoom(STATE.roomData);
 }
 
-window.kickPlayer = async function(targetId, targetName) {
+window.kickPlayer = async function (targetId, targetName) {
   if (!STATE.isHost) return;
   // Mark player as kicked in Firebase (the player's own listener will pick it up and redirect them)
   await update(ref(db, `rooms/${STATE.roomId}/players/${targetId}`), { kicked: true });
@@ -399,11 +411,11 @@ async function checkVotesEndGame() {
   let rData = (await get(ref(db, `rooms/${STATE.roomId}`))).val();
   const players = rData.players;
   let allVoted = true, votes = {};
-  for(let id in players) {
+  for (let id in players) {
     if (!players[id].votedFor) allVoted = false;
     else votes[players[id].votedFor] = (votes[players[id].votedFor] || 0) + 1;
   }
-  
+
   if (allVoted && rData.status === 'VOTING') {
     let max = 0, targets = [];
     for (let target in votes) {
@@ -415,7 +427,7 @@ async function checkVotesEndGame() {
 }
 
 async function endGame(winnerStr) {
-  if (STATE.roomData.status === 'FINISHED') return; 
+  if (STATE.roomData.status === 'FINISHED') return;
   await update(ref(db, `rooms/${STATE.roomId}`), { status: 'FINISHED', winner: winnerStr });
 }
 
@@ -431,7 +443,7 @@ document.getElementById('btn-send-chat').addEventListener('click', async (e) => 
 function renderChat(chatObj) {
   if (!chatObj) { document.getElementById('chat-messages').innerHTML = ''; return; }
   let html = '';
-  for(let key in chatObj) html += `<div><strong>${chatObj[key].sender}:</strong> ${chatObj[key].text}</div>`;
+  for (let key in chatObj) html += `<div><strong>${chatObj[key].sender}:</strong> ${chatObj[key].text}</div>`;
   const cont = document.getElementById('chat-messages');
   cont.innerHTML = html; cont.scrollTop = cont.scrollHeight;
 }
@@ -441,14 +453,14 @@ function handleTimer(timerEndTs) {
   clearInterval(timerInterval);
   if (!timerEndTs || STATE.roomData.status !== 'PLAYING') return;
   timerInterval = setInterval(() => {
-    let diff = Math.floor((timerEndTs - Date.now())/1000);
+    let diff = Math.floor((timerEndTs - Date.now()) / 1000);
     if (diff <= 0) {
       clearInterval(timerInterval);
       document.getElementById('display-timer').innerText = "00:00";
       if (STATE.isHost) update(ref(db, `rooms/${STATE.roomId}`), { status: 'VOTING' });
     } else {
-      let min = Math.floor(diff/60), sec = diff % 60;
-      document.getElementById('display-timer').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+      let min = Math.floor(diff / 60), sec = diff % 60;
+      document.getElementById('display-timer').innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
     }
   }, 1000);
 }
