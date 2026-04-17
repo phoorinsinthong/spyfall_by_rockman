@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>แกะรอยสายลับ Spyfall</title>
+  <link rel="stylesheet" href="style.css?v=3">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Dynamic Background Elements -->
+  <div class="decoration decoration1"></div>
+  <div class="decoration decoration2"></div>
+  <div class="decoration decoration3"></div>
+
+  <!-- Leave Room Confirm Modal -->
+  <div id="leave-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-icon">🚪</div>
+      <h3>ออกจากห้อง?</h3>
+      <p>คุณต้องการออกจากห้องนี้ใช่ไหม?</p>
+      <div class="modal-actions">
+        <button id="btn-leave-confirm" class="btn-leave-yes">ใช่ ออกเลย!</button>
+        <button id="btn-leave-cancel" class="btn-leave-no">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" id="app">
+    <!-- View: Home -->
+    <div id="view-home" class="view active animate-fade-in">
+      <div class="hero">
+        <h1 class="text-gradient bouncy-text">🕵️‍♂️ โคตรสายลับ</h1>
+        <p class="subtitle">ใครคือสายลับที่แฝงตัวอยู่?</p>
+      </div>
+      
+      <div class="glass-panel card hover-lift">
+        <div id="home-error" class="error hidden"></div>
+        
+        <div class="input-group">
+          <label>ชื่อของคุณ</label>
+          <input type="text" id="player-name" class="input-base shadow-inner" placeholder="พิมพ์ชื่อเล่น..." maxlength="16">
+        </div>
+        
+        <button id="btn-create-room" class="btn-primary pushable"><span class="front">➕ สร้างห้องใหม่</span></button>
+        
+        <div class="divider">หรือ</div>
+        
+        <div class="input-group">
+          <label>รหัสห้อง</label>
+          <input type="text" id="room-id-input" class="input-base shadow-inner" placeholder="กรอกรหัส 6 ตัวอักษร" maxlength="6" style="text-transform: uppercase;">
+        </div>
+        
+        <button id="btn-join-room" class="btn-secondary pushable-sec"><span class="front-sec">🤝 เข้าร่วมห้อง</span></button>
+      </div>
+    </div>
+
+    <!-- View: Room -->
+    <div id="view-room" class="view hidden animate-fade-in">
+      <div class="header">
+        <div class="header-row">
+          <button id="btn-leave-room" class="btn-leave" title="ออกจากห้อง">🚪 ออก</button>
+          <h2 class="text-gradient" id="room-state-title">ล็อบบี้รอกดพร้อม</h2>
+          <div class="room-id pill-shape shadow-soft" id="display-room-id">--</div>
+        </div>
+      </div>
+
+      <div class="glass-panel game-card hover-lift">
+        <!-- Sub-view: Lobby -->
+        <div id="subview-lobby">
+          <h3>👥 ผู้เล่น (<span id="player-count">0</span>)</h3>
+          <div class="player-list" id="player-list">
+            <!-- Player items generated here -->
+          </div>
+          <button id="btn-ready" class="btn-secondary pushable-sec mt-1"><span class="front-sec">✅ กดพร้อม</span></button>
+          
+          <div id="host-controls" class="hidden mt-1 host-box">
+            <h4>👑 ตั้งค่าสำหรับหัวหน้าห้อง</h4>
+            
+            <div class="input-group">
+              <label>ชุดสถานที่</label>
+              <select id="location-pack-select" class="input-base shadow-inner">
+                <option value="default">สถานที่มาตรฐาน</option>
+                <option value="custom">กำหนดสถานที่เอง</option>
+              </select>
+            </div>
+            
+            <div id="custom-locations-container" class="input-group hidden">
+              <label>รายชื่อสถานที่ (คั่นด้วยลูกน้ำ)</label>
+              <textarea id="custom-locations-input" class="input-base shadow-inner" rows="3" placeholder="ออฟฟิศ, ห้างสรรพสินค้า, โรงเรียน..."></textarea>
+            </div>
+
+            <div class="flex-gap align-center mb-1">
+              <input type="checkbox" id="enable-special-roles" class="cute-checkbox">
+              <label for="enable-special-roles" class="text-small">เปิดบท "ผู้สมรู้ร่วมคิด" (ต้องมี 4 คน+)</label>
+            </div>
+
+            <button id="btn-start" class="btn-primary pushable" disabled><span class="front">🚀 เริ่มเกม (ต้องมี 3 คน+)</span></button>
+          </div>
+        </div>
+
+        <!-- Sub-view: Playing -->
+        <div id="subview-playing" class="hidden">
+          <div class="secret-card bouncy-card">
+            <div class="role-title" id="display-role">บทบาท: </div>
+            <div class="location-title" id="display-location">สถานที่: </div>
+          </div>
+
+          <div class="timer-container" id="display-timer">08:00</div>
+
+          <button id="btn-call-vote" class="btn-secondary pushable-sec mt-1"><span class="front-sec">⚠️ เรียกเปิดโหวตจับสายลับ</span></button>
+          <button id="btn-show-locations" class="btn-accent pushable-accent mt-1"><span class="front-accent">📋 ดูเป้าหมายสถานที่</span></button>
+
+          <div id="location-reference-ui" class="hidden mt-1 glass-panel override-bg smooth-scroll">
+            <h4>📍 สถานที่ที่เป็นไปได้</h4>
+            <div id="location-list" class="location-tags">
+              <!-- Location items injected here -->
+            </div>
+          </div>
+
+          <div id="spy-guess-ui" class="hidden mt-1 flex-gap align-center">
+            <input type="text" id="spy-guess-input" class="input-base shadow-inner" placeholder="ทายสถานที่...">
+            <button id="btn-spy-guess" class="btn-primary pushable flex-shrink-0"><span class="front">ทายเลย!</span></button>
+          </div>
+        </div>
+
+        <!-- Sub-view: Voting -->
+        <div id="subview-voting" class="hidden">
+          <h3 class="text-center highlight-text">ใครคือสายลับ?</h3>
+          <p class="text-center mute-text" id="vote-status-text">เลือกผู้ต้องสงสัย</p>
+          <div class="vote-grid" id="vote-grid">
+            <!-- Dynamically populated -->
+          </div>
+          <button id="btn-submit-vote" class="btn-primary pushable mt-1" disabled><span class="front">ยืนยันการโหวต</span></button>
+        </div>
+
+        <!-- Sub-view: Finished -->
+        <div id="subview-finished" class="hidden text-center">
+          <h1 class="text-gradient font-xl bounce-in">จบเกม!</h1>
+          <h2 id="display-winner" class="winner-text">ผู้ชนะ: </h2>
+          
+          <div class="secret-card mt-1 override-bg shake-card">
+            <h3 id="display-spy-name">สายลับคือ: </h3>
+            <h4 id="display-true-location" class="highlight-text">สถานที่จริงคือ: </h4>
+          </div>
+
+          <button id="btn-back-home" class="btn-primary pushable mt-2 hidden"><span class="front">🏠 กลับล็อบบี้</span></button>
+        </div>
+
+        <!-- Chat System -->
+        <div id="chat-system" class="chat-container">
+          <div class="chat-messages smooth-scroll" id="chat-messages">
+            <!-- Chat history -->
+          </div>
+          <div class="chat-box">
+            <input type="text" id="chat-input" class="input-base shadow-inner" placeholder="พิมพ์แชท...">
+            <button id="btn-send-chat" class="btn-primary pushable flex-shrink-0"><span class="front">ส่ง</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
