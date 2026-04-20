@@ -51,6 +51,10 @@ const DEFAULT_LOCATIONS = {
   'ราชวัง / พระบรมมหาราชวัง': ['นักท่องเที่ยวไม่รู้กฎการแต่งกาย', 'ไกด์เล่าประวัติศาสตร์ไม่หยุด', 'เจ้าหน้าที่ยืนนิ่งเหมือนหุ่น', 'คนแอบถ่ายรูปในเขตห้าม', 'แฟชั่นนิสต้าใส่ชุดสั้น', 'พระราชวงศ์เสด็จ'],
 };
 
+const NON_STANDARD_LOCATIONS = {
+  'กกมง.กง.กห.': ['ผอ.', 'รอง ผอ.', 'พี่โย', 'โตน้อย', 'พี่เชียร', 'นิว', 'กัน', 'พี่นัท'],
+  'กจก.กง.กห.': ['ผอ.', 'รอง กอล์ฟ', 'รอง หญิง', 'พี่นัท', 'พี่โอ๋', 'พี่หนู', 'พี่ใหม่', 'โอปอ', 'พี่หมวย',]
+};
 
 let STATE = {
   playerName: '',
@@ -104,7 +108,7 @@ document.getElementById('btn-create-room').addEventListener('click', async () =>
   const roomRef = ref(db, `rooms/${STATE.roomId}`);
   const initialRoom = {
     status: 'LOBBY', host: STATE.playerId, targetLocation: '', winner: '', allLocations: [],
-    players: { [STATE.playerId]: { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '' } },
+    players: { [STATE.playerId]: { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '', wantsToVote: false } },
     chat: {}
   };
 
@@ -130,7 +134,7 @@ document.getElementById('btn-join-room').addEventListener('click', async () => {
       homeError.innerText = "ห้องนี้เริ่มเกมไปแล้ว"; homeError.classList.remove('hidden'); return;
     }
     STATE.playerName = name; STATE.playerId = generateId(); STATE.roomId = code; STATE.isHost = false;
-    await update(ref(db, `rooms/${code}/players/${STATE.playerId}`), { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '' });
+    await update(ref(db, `rooms/${code}/players/${STATE.playerId}`), { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '', wantsToVote: false });
     subscribeToRoom();
     switchView(true);
   } catch (err) { homeError.innerText = "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล"; homeError.classList.remove('hidden'); }
@@ -138,21 +142,64 @@ document.getElementById('btn-join-room').addEventListener('click', async () => {
 
 // SUBSCRIPTION
 let unsubscribe = null;
-function showKickedToast() {
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
-  toast.className = 'kicked-toast';
-  toast.innerHTML = '🥾 คุณถูกหัวหน้าห้องเตะออกแล้ว!';
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3500);
+  toast.className = `toast-notif ${type} animate-fade-in`;
+
+  const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+  toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toastFade 0.5s ease forwards';
+    setTimeout(() => toast.remove(), 500);
+  }, 3000);
+}
+
+function handleCopyRoomId() {
+  const text = STATE.roomId;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(`คัดลอกรหัสห้อง ${text} แล้ว!`, 'success');
+    const btn = document.getElementById('display-room-id');
+    btn.classList.add('click-effect');
+    setTimeout(() => btn.classList.remove('click-effect'), 200);
+  });
+}
+
+async function addSystemMessage(text) {
+  if (!STATE.roomId) return;
+  await set(push(ref(db, `rooms/${STATE.roomId}/chat`)), {
+    sender: 'ระบบ',
+    text: text,
+    isSystem: true
+  });
 }
 
 function subscribeToRoom() {
-
   const roomRef = ref(db, `rooms/${STATE.roomId}`);
-  document.getElementById('display-room-id').innerText = STATE.roomId;
+  const idDisplay = document.getElementById('room-id-text');
+  if (idDisplay) idDisplay.innerText = STATE.roomId;
+
+  // Add copy listener
+  document.getElementById('display-room-id').onclick = handleCopyRoomId;
+
   unsubscribe = onValue(roomRef, (snapshot) => {
-    if (!snapshot.exists()) { alert("ห้องถูกปิดลงแล้ว"); location.reload(); return; }
+    if (!snapshot.exists()) {
+      showToast("ห้องถูกปิดลงแล้ว", "warning");
+      setTimeout(() => location.reload(), 1500);
+      return;
+    }
+    const prevStatus = STATE.roomData?.status;
     STATE.roomData = snapshot.val();
+
+    // Detect status changes for system messages
+    if (prevStatus && prevStatus !== STATE.roomData.status && STATE.isHost) {
+      if (STATE.roomData.status === 'PLAYING') addSystemMessage('🚀 เริ่มเกมแล้ว! หาตัวสายลับให้เจอ');
+      if (STATE.roomData.status === 'VOTING') addSystemMessage('⚖️ เริ่มการโหวต! เลือกคนที่คุณสงสัย');
+    }
+
     renderRoom(STATE.roomData);
   });
 }
@@ -165,7 +212,7 @@ function renderRoom(data) {
     // Player was removed — show kicked notification and go home
     if (unsubscribe) unsubscribe();
     STATE = { playerName: '', playerId: null, roomId: null, isHost: false, roomData: null, voteTarget: null };
-    showKickedToast();
+    showToast('🥾 คุณถูกหัวหน้าห้องเตะออกแล้ว!', 'warning');
     switchView(false);
     return;
   }
@@ -175,11 +222,17 @@ function renderRoom(data) {
   }
 
   STATE.isHost = (data.host === STATE.playerId);
-  document.getElementById('room-state-title').innerText = data.status === 'LOBBY' ? 'ล็อบบี้รอกดพร้อม' : data.status === 'PLAYING' ? 'กำลังเล่นเผ็ดมันส์' : data.status === 'VOTING' ? 'ช่วงเวลาโหวต!' : 'จบเกมแล้ว';
+  const badge = document.getElementById('room-state-badge');
+  if (badge) {
+    if (data.status === 'LOBBY') { badge.className = 'state-badge lobby'; badge.innerText = '🏠 ล็อบบี้'; }
+    else if (data.status === 'PLAYING') { badge.className = 'state-badge playing'; badge.innerText = '🔥 กำลังเล่น'; }
+    else if (data.status === 'VOTING') { badge.className = 'state-badge voting'; badge.innerText = '⚖️ โหวต'; }
+    else { badge.className = 'state-badge'; badge.innerText = '🏁 จบเกม'; }
+  }
   switchSubView(data.status);
 
   if (data.status === 'LOBBY') {
-    document.getElementById('btn-ready').innerHTML = me.isReady ? '<span class="front-sec">❌ ยกเลิกพร้อม</span>' : '<span class="front-sec">✅ กดพร้อม</span>';
+    document.getElementById('btn-ready').innerHTML = me.isReady ? '<span class="front-sec" style="background:rgba(255,255,255,0.1); color:var(--text-primary); border-color:var(--border-medium);">❌ ยกเลิกพร้อม</span>' : '<span class="front-sec">✅ กดพร้อม</span>';
     const hostControls = document.getElementById('host-controls');
     if (STATE.isHost) {
       hostControls.classList.remove('hidden');
@@ -207,20 +260,48 @@ function renderRoom(data) {
   }
 
   if (data.status === 'PLAYING') {
-    document.getElementById('display-role').innerText = `บทบาท: ${me.role}`;
+    const roleElem = document.getElementById('display-role');
+    const locElem = document.getElementById('display-location');
+    const locLabel = document.getElementById('location-label-text');
+
+    roleElem.innerText = me.role;
+    if (me.role === 'สายลับ') roleElem.classList.add('spy-role');
+    else roleElem.classList.remove('spy-role');
+
     let isSpyOrAccomplice = me.role === 'สายลับ' || me.role === 'ผู้สมรู้ร่วมคิด';
 
     if (me.role === 'ผู้สมรู้ร่วมคิด') {
       let spyName = Object.values(players).find(p => p.role === 'สายลับ')?.name;
-      document.getElementById('display-location').innerText = `สายลับคือ: ${spyName}`;
+      locLabel.innerText = 'สายลับคือ';
+      locElem.innerText = spyName;
     } else if (me.role === 'สายลับ') {
-      document.getElementById('display-location').innerText = 'ตีเนียนเข้าไว้ หาที่นี่ให้เจอ!';
+      locLabel.innerText = 'เป้าหมาย';
+      locElem.innerHTML = 'หาที่นี่ให้เจอ! <div class="spy-hint">แฝงตัวและฟังให้ดี..</div>';
     } else {
-      document.getElementById('display-location').innerText = `สถานที่: ${me.location}`;
+      locLabel.innerText = 'สถานที่';
+      locElem.innerText = me.location;
     }
 
     if (me.role === 'สายลับ') document.getElementById('spy-guess-ui').classList.remove('hidden');
     else document.getElementById('spy-guess-ui').classList.add('hidden');
+
+    // Wants to vote logic
+    let wantsToVoteCount = 0;
+    for (let id in players) {
+      if (players[id].wantsToVote) wantsToVoteCount++;
+    }
+    const requiredVotes = Math.ceil((playerIds.length * 2) / 3);
+
+    const btnCallVote = document.getElementById('btn-call-vote');
+    if (me.wantsToVote) {
+      btnCallVote.innerHTML = `<span class="front-sec" style="background:rgba(255,255,255,0.1); color:var(--text-primary); border-color:var(--border-medium);">❌ ยกเลิกขอเปิดโหวต (${wantsToVoteCount}/${requiredVotes})</span>`;
+    } else {
+      btnCallVote.innerHTML = `<span class="front-sec">⚠️ ขอเปิดโหวตจับสายลับ ${wantsToVoteCount > 0 ? `(${wantsToVoteCount}/${requiredVotes})` : ''}</span>`;
+    }
+
+    if (STATE.isHost && wantsToVoteCount >= requiredVotes && data.status === 'PLAYING') {
+      update(ref(db, `rooms/${STATE.roomId}`), { status: 'VOTING' });
+    }
 
     // Show spy-revealing banner to ALL players
     const banner = document.getElementById('spy-revealing-banner');
@@ -247,9 +328,21 @@ function renderRoom(data) {
   if (data.status === 'FINISHED') {
     let winnerText = data.winner === 'Spy' ? 'สายลับ 🎉' : 'ชาวบ้าน 🏘️';
     document.getElementById('display-winner').innerText = `ผู้ชนะ: ${winnerText}`;
+
+    const resultCard = document.getElementById('result-card');
+    const winnerDisplay = document.getElementById('display-winner');
+    if (data.winner === 'Spy') {
+      resultCard.classList.add('spy-won');
+      winnerDisplay.classList.add('spy-won');
+    } else {
+      resultCard.classList.remove('spy-won');
+      winnerDisplay.classList.remove('spy-won');
+    }
+
     let spyName = Object.values(players).find(p => p.role === 'สายลับ')?.name;
-    document.getElementById('display-spy-name').innerText = `สายลับคือ: ${spyName}`;
-    document.getElementById('display-true-location').innerText = `สถานที่จริงคือ: ${data.targetLocation}`;
+    document.getElementById('display-spy-name').innerText = spyName;
+    document.getElementById('display-true-location').innerText = data.targetLocation;
+
     if (STATE.isHost) document.getElementById('btn-back-home').classList.remove('hidden');
     else document.getElementById('btn-back-home').classList.add('hidden');
   }
@@ -272,16 +365,22 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   // Determine Location Pack
   let pool = [];
   const packType = document.getElementById('location-pack-select').value;
+  let packDict = DEFAULT_LOCATIONS;
+
   if (packType === 'custom') {
     const raw = document.getElementById('custom-locations-input').value;
     pool = raw.split(',').map(s => s.trim()).filter(s => s);
     if (pool.length < 3) pool = Object.keys(DEFAULT_LOCATIONS);
+  } else if (packType === 'non_standard') {
+    packDict = NON_STANDARD_LOCATIONS;
+    pool = Object.keys(packDict);
   } else {
-    pool = Object.keys(DEFAULT_LOCATIONS);
+    packDict = DEFAULT_LOCATIONS;
+    pool = Object.keys(packDict);
   }
 
   const targetLoc = pool[Math.floor(Math.random() * pool.length)];
-  let availableRoles = DEFAULT_LOCATIONS[targetLoc] ? [...DEFAULT_LOCATIONS[targetLoc]] : [];
+  let availableRoles = packDict[targetLoc] ? [...packDict[targetLoc]] : [];
 
   // Determine Spy & Accompolice
   const enableSpecial = document.getElementById('enable-special-roles').checked;
@@ -293,11 +392,12 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     accompliceId = shuffledIds[1];
   }
 
-  let updates = { targetLocation: targetLoc, status: 'PLAYING', timerEnd: Date.now() + (8 * 60 * 1000), winner: '', chat: {}, allLocations: pool };
+  let updates = { targetLocation: targetLoc, status: 'PLAYING', timerEnd: Date.now() + (8 * 60 * 1000), winner: '', allLocations: pool };
 
   ids.forEach(id => {
     updates[`players/${id}/votedFor`] = '';
     updates[`players/${id}/isReady`] = false;
+    updates[`players/${id}/wantsToVote`] = false;
 
     if (id === spyId) {
       updates[`players/${id}/role`] = 'สายลับ';
@@ -313,6 +413,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   });
 
   await update(ref(db, `rooms/${STATE.roomId}`), updates);
+  showToast("เกมเริ่มแล้ว!", "success");
 });
 
 document.getElementById('btn-back-home').addEventListener('click', async () => {
@@ -373,7 +474,8 @@ document.getElementById('btn-submit-vote').addEventListener('click', async () =>
 });
 
 document.getElementById('btn-call-vote').addEventListener('click', async () => {
-  await update(ref(db, `rooms/${STATE.roomId}`), { status: 'VOTING' });
+  const currWantsToVote = STATE.roomData.players[STATE.playerId].wantsToVote;
+  await update(ref(db, `rooms/${STATE.roomId}/players/${STATE.playerId}`), { wantsToVote: !currWantsToVote });
 });
 
 // Spy reveal flow
@@ -402,8 +504,33 @@ document.getElementById('btn-spy-guess-confirm').addEventListener('click', async
   if (!guess) { document.getElementById('spy-location-select').style.border = '3px solid #ef4444'; return; }
   document.getElementById('spy-reveal-modal').classList.add('hidden');
   await update(ref(db, `rooms/${STATE.roomId}`), { spyRevealing: '' });
-  if (guess === STATE.roomData.targetLocation) endGame('Spy');
-  else endGame('Players');
+  if (guess === STATE.roomData.targetLocation) {
+    showToast("สายลับทายถูก!", "warning");
+    endGame('Spy');
+  } else {
+    showToast("สายลับทายผิด!", "success");
+    endGame('Players');
+  }
+});
+
+// Location Modal Logic
+document.getElementById('btn-show-locations').addEventListener('click', () => {
+  const modal = document.getElementById('locations-modal');
+  const container = document.getElementById('locations-grid-list');
+  const pool = STATE.roomData.allLocations || Object.keys(DEFAULT_LOCATIONS);
+
+  container.innerHTML = pool.map(loc => `
+    <div class="location-list-item">
+      <span>📍</span>
+      <span>${loc}</span>
+    </div>
+  `).join('');
+
+  modal.classList.remove('hidden');
+});
+
+document.getElementById('btn-close-locations').addEventListener('click', () => {
+  document.getElementById('locations-modal').classList.add('hidden');
 });
 
 
@@ -443,7 +570,19 @@ document.getElementById('btn-send-chat').addEventListener('click', async (e) => 
 function renderChat(chatObj) {
   if (!chatObj) { document.getElementById('chat-messages').innerHTML = ''; return; }
   let html = '';
-  for (let key in chatObj) html += `<div><strong>${chatObj[key].sender}:</strong> ${chatObj[key].text}</div>`;
+  for (let key in chatObj) {
+    let m = chatObj[key];
+    if (m.isSystem) {
+      html += `<div class="chat-msg system-msg">
+        <div class="msg-text">${m.text}</div>
+      </div>`;
+    } else {
+      html += `<div class="chat-msg">
+        <span class="sender">${m.sender}</span>
+        <div class="msg-text">${m.text}</div>
+      </div>`;
+    }
+  }
   const cont = document.getElementById('chat-messages');
   cont.innerHTML = html; cont.scrollTop = cont.scrollHeight;
 }
@@ -452,8 +591,28 @@ let timerInterval;
 function handleTimer(timerEndTs) {
   clearInterval(timerInterval);
   if (!timerEndTs || STATE.roomData.status !== 'PLAYING') return;
+
+  const timerBar = document.getElementById('timer-bar-fill');
+  const timerContainer = document.getElementById('display-timer');
+  const totalTimeMs = 8 * 60 * 1000;
+
   timerInterval = setInterval(() => {
-    let diff = Math.floor((timerEndTs - Date.now()) / 1000);
+    let diffMs = timerEndTs - Date.now();
+    let diff = Math.floor(diffMs / 1000);
+
+    if (timerBar && timerContainer) {
+      let progress = Math.max(0, Math.min(100, (diffMs / totalTimeMs) * 100));
+      timerBar.style.width = `${progress}%`;
+
+      if (progress < 15) {
+        timerBar.style.background = 'var(--grad-danger)';
+        timerContainer.classList.add('warning');
+      } else {
+        timerBar.style.background = 'var(--grad-primary)';
+        timerContainer.classList.remove('warning');
+      }
+    }
+
     if (diff <= 0) {
       clearInterval(timerInterval);
       document.getElementById('display-timer').innerText = "00:00";
