@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="โคตรสายลับ — เกม Spyfall ออนไลน์สำหรับกลุ่มผู้เล่น ค้นหาสายลับที่แฝงตัวอยู่ในกลุ่ม">
   <title>โคตรสายลับ — Spyfall Online</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -24,6 +24,22 @@
   <div id="toast-container" style="position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; flex-direction: column; gap: 0.5rem; width: auto; max-width: 90vw; pointer-events: none;"></div>
 
 
+  <!-- ===== REJOIN BANNER ===== -->
+  <div id="rejoin-banner" class="rejoin-banner hidden">
+    <div class="rejoin-content">
+      <div class="rejoin-icon">🔄</div>
+      <div class="rejoin-info">
+        <div class="rejoin-title">พบเซสชั่นค้างอยู่!</div>
+        <div class="rejoin-sub">คุณเคยอยู่ในห้อง <span id="rejoin-room-id-text" class="rejoin-room-pill">------</span> ในฐานะ <span id="rejoin-player-name-text" class="rejoin-name"></span></div>
+      </div>
+      <div class="rejoin-actions">
+        <button id="btn-rejoin" class="btn-rejoin-confirm">🚪 กลับเข้าห้อง</button>
+        <button id="btn-rejoin-dismiss" class="btn-rejoin-dismiss">✕</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ===== SPY REVEAL MODAL ===== -->
   <div id="spy-reveal-modal" class="modal-overlay hidden">
     <div class="modal-box spy-modal">
@@ -36,8 +52,7 @@
           <option value="">— เลือกสถานที่ —</option>
         </select>
       </div>
-      </div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="margin-top:1.25rem;">
         <button id="btn-spy-guess-confirm" class="btn-leave-yes">🎯 ยืนยัน!</button>
         <button id="btn-spy-cancel-reveal" class="btn-leave-no">ยกเลิก</button>
       </div>
@@ -73,11 +88,53 @@
     </div>
   </div>
 
+
+  <!-- ===== ADMIN MODAL ===== -->
+  <div id="admin-modal" class="modal-overlay hidden">
+    <div class="modal-box admin-modal-box">
+      <div class="modal-icon">🔑</div>
+      <h3>Admin Panel</h3>
+      <p style="color: var(--text-muted); margin-bottom: 1.25rem; font-size: 0.9rem;">ใส่รหัสผ่าน Admin เพื่อเข้าถึงฟังก์ชัน</p>
+
+      <div class="input-group">
+        <label>รหัสผ่าน Admin</label>
+        <input type="password" id="admin-password-input" class="input-base shadow-inner"
+          placeholder="กรอกรหัสผ่าน..." autocomplete="off">
+      </div>
+
+      <div id="admin-error" class="error hidden" style="margin-bottom: 1rem;"></div>
+
+      <div class="admin-actions">
+        <button id="btn-admin-reset" class="btn-admin-reset">
+          🗑️ Reset ห้องทั้งหมด
+        </button>
+        <button id="btn-admin-close" class="btn-leave-no" style="width: 100%;">ยกเลิก</button>
+      </div>
+
+      <div id="admin-confirm-zone" class="admin-confirm-zone hidden">
+        <div class="admin-confirm-warning">
+          ⚠️ คุณแน่ใจหรือไม่? การกระทำนี้จะ<strong>ลบห้องทั้งหมด</strong>ใน Database และ<strong>ไม่สามารถกู้คืนได้</strong>!
+        </div>
+        <div class="modal-actions">
+          <button id="btn-admin-confirm-reset" class="btn-leave-yes">✅ ยืนยัน ลบทั้งหมด</button>
+          <button id="btn-admin-cancel-reset" class="btn-leave-no">ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ===== MAIN APP ===== -->
   <div class="container" id="app">
 
     <!-- ===== VIEW: HOME ===== -->
     <div id="view-home" class="view active animate-fade-in">
+
+      <!-- Admin Button -->
+      <button id="btn-open-admin" class="btn-admin-trigger" title="Admin Panel">
+        🔑
+      </button>
+
       <div class="hero">
         <span class="hero-icon">🕵️‍♂️</span>
         <h1 class="text-gradient bouncy-text">โคตรสายลับ</h1>
@@ -97,18 +154,30 @@
           <span class="front">➕ สร้างห้องใหม่</span>
         </button>
 
-        <div class="divider">หรือเข้าร่วมห้อง</div>
+        <div class="divider">หรือเข้าร่วมห้องที่มีอยู่</div>
 
-        <div class="input-group">
-          <label>รหัสห้อง</label>
-          <input type="text" id="room-id-input" class="input-base shadow-inner"
-            placeholder="กรอกรหัส 6 ตัวอักษร" maxlength="6"
-            style="text-transform:uppercase; letter-spacing:3px; font-weight:700;" autocomplete="off">
+        <!-- Room List Panel -->
+        <div class="room-list-panel">
+          <div class="room-list-header">
+            <span>🏠 ห้องที่เปิดอยู่</span>
+            <button id="btn-refresh-rooms" class="btn-refresh" title="รีเฟรช">🔄</button>
+          </div>
+
+          <div id="room-list-loading" class="room-list-loading">
+            <div class="spinner"></div>
+            <span>กำลังโหลดห้อง...</span>
+          </div>
+
+          <div id="room-list-empty" class="room-list-empty hidden">
+            <span>😴</span>
+            <span>ยังไม่มีห้องที่เปิดอยู่ สร้างห้องใหม่เลย!</span>
+          </div>
+
+          <div id="room-list-items" class="room-list-items hidden">
+            <!-- Populated by JS -->
+          </div>
         </div>
 
-        <button id="btn-join-room" class="pushable-sec">
-          <span class="front-sec">🤝 เข้าร่วมห้อง</span>
-        </button>
       </div>
     </div>
 
@@ -149,7 +218,18 @@
             <div class="input-group">
               <label>ชุดสถานที่</label>
               <select id="location-pack-select" class="input-base shadow-inner">
-                <option value="default">🗺️ สถานที่มาตรฐาน (30+ แห่ง)</option>
+                <option value="all_cats">🌟 รวมทุกหมวดหมู่ (300 แห่ง)</option>
+                <option value="cat_food">🍽 อาหารและเครื่องดื่ม</option>
+                <option value="cat_travel">✈ การเดินทางและขนส่ง</option>
+                <option value="cat_health">🏥 สุขภาพและการแพทย์</option>
+                <option value="cat_edu">🎓 การศึกษาและความรู้</option>
+                <option value="cat_entertain">🎭 บันเทิงและกีฬา</option>
+                <option value="cat_work">💼 ที่ทำงานและธุรกิจ</option>
+                <option value="cat_nature">🌿 ธรรมชาติและผจญภัย</option>
+                <option value="cat_gov">🏛 หน่วยงานรัฐและกฎหมาย</option>
+                <option value="cat_reli">⛩ ศาสนาและวัฒนธรรม</option>
+                <option value="cat_tech">🚀 เทคโนโลยีและอวกาศ</option>
+                <option value="default">🗺️ สถานที่มาตรฐานเดิม (50+ แห่ง)</option>
                 <option value="non_standard">🏢 สถานที่ไม่มาตรฐาน (กกมง.กง.กห.)</option>
                 <option value="custom">✏️ กำหนดสถานที่เอง</option>
               </select>

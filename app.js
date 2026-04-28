@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update, child, push, remove } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 import { firebaseConfig } from './firebase-config.js';
+import { CATS } from './categories.js';
 
 // Init Firebase
 const app = initializeApp(firebaseConfig);
@@ -65,6 +66,63 @@ let STATE = {
   voteTarget: null,
 };
 
+// SESSION MANAGEMENT
+function saveSession() {
+  localStorage.setItem('spyfall_session', JSON.stringify({
+    playerId: STATE.playerId,
+    playerName: STATE.playerName,
+    roomId: STATE.roomId
+  }));
+}
+
+function clearSession() {
+  localStorage.removeItem('spyfall_session');
+}
+
+async function checkSessionOnLoad() {
+  const sessionData = localStorage.getItem('spyfall_session');
+  if (!sessionData) return;
+
+  try {
+    const session = JSON.parse(sessionData);
+    if (session.roomId && session.playerId && session.playerName) {
+      const roomRef = ref(db, `rooms/${session.roomId}`);
+      const snapshot = await get(roomRef);
+      if (snapshot.exists()) {
+        const room = snapshot.val();
+        if (room.players && room.players[session.playerId]) {
+          // Session is valid and player is still in the room
+          document.getElementById('rejoin-room-id-text').innerText = session.roomId;
+          document.getElementById('rejoin-player-name-text').innerText = session.playerName;
+          document.getElementById('rejoin-banner').classList.remove('hidden');
+
+          // Add listeners for rejoin buttons
+          document.getElementById('btn-rejoin').onclick = () => {
+            STATE.playerId = session.playerId;
+            STATE.playerName = session.playerName;
+            STATE.roomId = session.roomId;
+            document.getElementById('rejoin-banner').classList.add('hidden');
+            subscribeToRoom();
+            switchView(true);
+          };
+
+          document.getElementById('btn-rejoin-dismiss').onclick = () => {
+            clearSession();
+            document.getElementById('rejoin-banner').classList.add('hidden');
+          };
+          return;
+        }
+      }
+    }
+    // If not valid, clear it
+    clearSession();
+  } catch (e) {
+    clearSession();
+  }
+}
+// Run on load
+checkSessionOnLoad();
+
 const viewHome = document.getElementById('view-home');
 const viewRoom = document.getElementById('view-room');
 const homeError = document.getElementById('home-error');
@@ -78,8 +136,17 @@ function generateId() { return Math.random().toString(36).substring(2, 10); }
 function generateRoomCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
 function switchView(toRoom) {
-  if (toRoom) { viewHome.classList.add('hidden'); viewRoom.classList.remove('hidden'); }
-  else { viewRoom.classList.add('hidden'); viewHome.classList.remove('hidden'); }
+  if (toRoom) {
+    // Stop the room list listener when entering a room
+    if (roomsUnsubscribe) { roomsUnsubscribe(); roomsUnsubscribe = null; }
+    viewHome.classList.add('hidden');
+    viewRoom.classList.remove('hidden');
+  } else {
+    viewRoom.classList.add('hidden');
+    viewHome.classList.remove('hidden');
+    // Restart room list listener when going back home
+    loadRoomList();
+  }
 }
 
 function switchSubView(status) {
@@ -98,6 +165,142 @@ document.getElementById('location-pack-select').addEventListener('change', (e) =
   else customUi.classList.add('hidden');
 });
 
+// ADMIN ACTIONS
+const ADMIN_PASSWORD = 'admin'; // <--- Change this to the actual password requested
+
+document.getElementById('btn-open-admin').addEventListener('click', () => {
+  document.getElementById('admin-modal').classList.remove('hidden');
+  document.getElementById('admin-password-input').value = '';
+  document.getElementById('admin-error').classList.add('hidden');
+  document.getElementById('admin-confirm-zone').classList.add('hidden');
+});
+
+document.getElementById('btn-admin-close').addEventListener('click', () => {
+  document.getElementById('admin-modal').classList.add('hidden');
+});
+
+document.getElementById('btn-admin-reset').addEventListener('click', () => {
+  const pwd = document.getElementById('admin-password-input').value;
+  if (pwd === ADMIN_PASSWORD) {
+    document.getElementById('admin-error').classList.add('hidden');
+    document.getElementById('admin-confirm-zone').classList.remove('hidden');
+  } else {
+    document.getElementById('admin-error').innerText = "รหัสผ่านไม่ถูกต้อง";
+    document.getElementById('admin-error').classList.remove('hidden');
+  }
+});
+
+document.getElementById('btn-admin-cancel-reset').addEventListener('click', () => {
+  document.getElementById('admin-confirm-zone').classList.add('hidden');
+});
+
+document.getElementById('btn-admin-confirm-reset').addEventListener('click', async () => {
+  try {
+    await remove(ref(db, 'rooms'));
+    document.getElementById('admin-modal').classList.add('hidden');
+    showToast("ลบห้องทั้งหมดเรียบร้อยแล้ว", "success");
+  } catch (err) {
+    document.getElementById('admin-error').innerText = "เกิดข้อผิดพลาดในการลบห้อง";
+    document.getElementById('admin-error').classList.remove('hidden');
+  }
+});
+
+
+// ROOM LIST LOGIC
+let roomsUnsubscribe = null;
+
+function loadRoomList() {
+  const listLoading = document.getElementById('room-list-loading');
+  const listEmpty = document.getElementById('room-list-empty');
+  const listItems = document.getElementById('room-list-items');
+  const btnRefresh = document.getElementById('btn-refresh-rooms');
+
+  btnRefresh.classList.add('spin-anim');
+  
+  if (roomsUnsubscribe) roomsUnsubscribe();
+
+  listLoading.classList.remove('hidden');
+  listEmpty.classList.add('hidden');
+  listItems.classList.add('hidden');
+
+  roomsUnsubscribe = onValue(ref(db, 'rooms'), (snapshot) => {
+    listLoading.classList.add('hidden');
+    btnRefresh.classList.remove('spin-anim');
+
+    if (!snapshot.exists()) {
+      listEmpty.classList.remove('hidden');
+      listItems.innerHTML = '';
+      return;
+    }
+
+    const rooms = snapshot.val();
+    const openRooms = Object.entries(rooms).filter(([id, room]) => room.status === 'LOBBY' || room.status === 'PLAYING');
+
+    if (openRooms.length === 0) {
+      listEmpty.classList.remove('hidden');
+      listItems.innerHTML = '';
+      return;
+    }
+
+    listEmpty.classList.add('hidden');
+    listItems.classList.remove('hidden');
+    
+    listItems.innerHTML = openRooms.map(([id, room]) => {
+      const pCount = room.players ? Object.keys(room.players).length : 0;
+      const statusIcon = room.status === 'LOBBY' ? '🏠' : '🔥';
+      const statusText = room.status === 'LOBBY' ? 'ล็อบบี้' : 'กำลังเล่น';
+      const isJoinable = room.status === 'LOBBY';
+
+      return `
+        <div class="room-list-item ${isJoinable ? '' : 'disabled'}" onclick="${isJoinable ? `window.joinFromList('${id}')` : ''}">
+          <div class="room-list-info">
+            <span class="room-list-id">${id}</span>
+            <span class="room-list-count">👥 ${pCount} คน</span>
+            <span class="room-list-status">${statusIcon} ${statusText}</span>
+          </div>
+          ${isJoinable ? '<button class="btn-join-sm">เข้าร่วม</button>' : '<span class="status-full">เข้าไม่ได้</span>'}
+        </div>
+      `;
+    }).join('');
+  }, (error) => {
+    console.error('Room list error:', error);
+    listLoading.classList.add('hidden');
+    listEmpty.classList.remove('hidden');
+  }); // real-time listener
+}
+
+document.getElementById('btn-refresh-rooms').addEventListener('click', loadRoomList);
+// Initial load
+loadRoomList();
+
+
+// JOIN FROM LIST
+window.joinFromList = async function(code) {
+  const name = document.getElementById('player-name').value.trim();
+  if (!name) { 
+    homeError.innerText = "กรุณากรอกชื่อของคุณก่อนเข้าร่วมห้อง"; 
+    homeError.classList.remove('hidden'); 
+    document.getElementById('player-name').focus();
+    return; 
+  }
+
+  homeError.classList.add('hidden');
+  const roomRef = ref(db, `rooms/${code}`);
+  try {
+    const snapshot = await get(roomRef);
+    if (!snapshot.exists()) { homeError.innerText = "ไม่พบห้องนี้"; homeError.classList.remove('hidden'); return; }
+    if (snapshot.val().status !== 'LOBBY') {
+      homeError.innerText = "ห้องนี้เริ่มเกมไปแล้ว"; homeError.classList.remove('hidden'); return;
+    }
+    STATE.playerName = name; STATE.playerId = generateId(); STATE.roomId = code; STATE.isHost = false;
+    await update(ref(db, `rooms/${code}/players/${STATE.playerId}`), { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '', wantsToVote: false });
+    
+    saveSession();
+    subscribeToRoom();
+    switchView(true);
+  } catch (err) { homeError.innerText = "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล"; homeError.classList.remove('hidden'); }
+};
+
 // HOME ACTIONS
 document.getElementById('btn-create-room').addEventListener('click', async () => {
   const name = document.getElementById('player-name').value.trim();
@@ -114,30 +317,12 @@ document.getElementById('btn-create-room').addEventListener('click', async () =>
 
   try {
     await set(roomRef, initialRoom);
+    saveSession();
     subscribeToRoom();
     switchView(true);
   } catch (err) {
     homeError.innerText = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ Firebase"; homeError.classList.remove('hidden');
   }
-});
-
-document.getElementById('btn-join-room').addEventListener('click', async () => {
-  const name = document.getElementById('player-name').value.trim();
-  const code = document.getElementById('room-id-input').value.trim().toUpperCase();
-  if (!name || !code) { homeError.innerText = "กรุณากรอกชื่อและรหัสห้อง"; homeError.classList.remove('hidden'); return; }
-
-  const roomRef = ref(db, `rooms/${code}`);
-  try {
-    const snapshot = await get(roomRef);
-    if (!snapshot.exists()) { homeError.innerText = "ไม่พบห้องนี้"; homeError.classList.remove('hidden'); return; }
-    if (snapshot.val().status !== 'LOBBY' && snapshot.val().status !== 'FINISHED') {
-      homeError.innerText = "ห้องนี้เริ่มเกมไปแล้ว"; homeError.classList.remove('hidden'); return;
-    }
-    STATE.playerName = name; STATE.playerId = generateId(); STATE.roomId = code; STATE.isHost = false;
-    await update(ref(db, `rooms/${code}/players/${STATE.playerId}`), { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '', wantsToVote: false });
-    subscribeToRoom();
-    switchView(true);
-  } catch (err) { homeError.innerText = "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล"; homeError.classList.remove('hidden'); }
 });
 
 // SUBSCRIPTION
@@ -188,6 +373,7 @@ function subscribeToRoom() {
   unsubscribe = onValue(roomRef, (snapshot) => {
     if (!snapshot.exists()) {
       showToast("ห้องถูกปิดลงแล้ว", "warning");
+      clearSession();
       setTimeout(() => location.reload(), 1500);
       return;
     }
@@ -212,6 +398,7 @@ function renderRoom(data) {
     // Player was removed — show kicked notification and go home
     if (unsubscribe) unsubscribe();
     STATE = { playerName: '', playerId: null, roomId: null, isHost: false, roomData: null, voteTarget: null };
+    clearSession();
     showToast('🥾 คุณถูกหัวหน้าห้องเตะออกแล้ว!', 'warning');
     switchView(false);
     return;
@@ -365,9 +552,20 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   // Determine Location Pack
   let pool = [];
   const packType = document.getElementById('location-pack-select').value;
-  let packDict = DEFAULT_LOCATIONS;
+  let packDict = {};
 
-  if (packType === 'custom') {
+  if (packType === 'all_cats') {
+    CATS.forEach(c => c.places.forEach(p => packDict[p.n] = p.r));
+    pool = Object.keys(packDict);
+  } else if (packType.startsWith('cat_')) {
+    const catId = packType.replace('cat_', '');
+    const category = CATS.find(c => c.id === catId);
+    if (category) {
+      category.places.forEach(p => packDict[p.n] = p.r);
+    }
+    pool = Object.keys(packDict);
+    if (pool.length < 3) { packDict = DEFAULT_LOCATIONS; pool = Object.keys(packDict); } // Fallback
+  } else if (packType === 'custom') {
     const raw = document.getElementById('custom-locations-input').value;
     pool = raw.split(',').map(s => s.trim()).filter(s => s);
     if (pool.length < 3) pool = Object.keys(DEFAULT_LOCATIONS);
@@ -437,6 +635,7 @@ async function doLeaveRoom() {
   } catch (e) { /* ignore */ }
   if (unsubscribe) unsubscribe();
   STATE = { playerName: '', playerId: null, roomId: null, isHost: false, roomData: null, voteTarget: null };
+  clearSession();
   document.getElementById('leave-modal').classList.add('hidden');
   switchView(false);
 }
