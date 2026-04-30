@@ -66,6 +66,68 @@ let STATE = {
   voteTarget: null,
 };
 
+// Track previous spyRevealing state for sound notification
+let prevSpyRevealing = '';
+
+// ===== SOUND NOTIFICATION =====
+function playSpyAlertSound() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Three-tone alert: ascending urgent beeps
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.18);
+      gain.gain.setValueAtTime(0.35, audioCtx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.18 + 0.16);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(audioCtx.currentTime + i * 0.18);
+      osc.stop(audioCtx.currentTime + i * 0.18 + 0.16);
+    });
+  } catch (e) { /* Audio not supported */ }
+}
+
+// ===== REMEMBER PLAYER NAME =====
+function savePlayerName(name) {
+  localStorage.setItem('spyfall_player_name', name);
+}
+function loadPlayerName() {
+  return localStorage.getItem('spyfall_player_name') || '';
+}
+// Pre-fill player name on load
+window.addEventListener('DOMContentLoaded', () => {
+  const savedName = loadPlayerName();
+  if (savedName) {
+    const input = document.getElementById('player-name');
+    if (input) input.value = savedName;
+  }
+});
+
+// ===== AUTO-CLOSE ROOMS (15 min) =====
+function startRoomCleanupInterval() {
+  setInterval(async () => {
+    try {
+      const snapshot = await get(ref(db, 'rooms'));
+      if (!snapshot.exists()) return;
+      const rooms = snapshot.val();
+      const now = Date.now();
+      const FIFTEEN_MIN = 15 * 60 * 1000;
+      for (const [roomId, room] of Object.entries(rooms)) {
+        if (room.status === 'LOBBY' && room.createdAt) {
+          if (now - room.createdAt > FIFTEEN_MIN) {
+            console.log(`Auto-closing expired room: ${roomId}`);
+            await remove(ref(db, `rooms/${roomId}`));
+          }
+        }
+      }
+    } catch (e) { /* ignore cleanup errors */ }
+  }, 60 * 1000); // Check every 1 minute
+}
+startRoomCleanupInterval();
+
 // SESSION MANAGEMENT
 function saveSession() {
   localStorage.setItem('spyfall_session', JSON.stringify({
@@ -293,6 +355,7 @@ window.joinFromList = async function(code) {
       homeError.innerText = "ห้องนี้เริ่มเกมไปแล้ว"; homeError.classList.remove('hidden'); return;
     }
     STATE.playerName = name; STATE.playerId = generateId(); STATE.roomId = code; STATE.isHost = false;
+    savePlayerName(name);
     await update(ref(db, `rooms/${code}/players/${STATE.playerId}`), { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '', wantsToVote: false });
     
     saveSession();
@@ -307,10 +370,12 @@ document.getElementById('btn-create-room').addEventListener('click', async () =>
   if (!name) { homeError.innerText = "กรุณากรอกชื่อของคุณ"; homeError.classList.remove('hidden'); return; }
 
   STATE.playerName = name; STATE.playerId = generateId(); STATE.roomId = generateRoomCode(); STATE.isHost = true;
+  savePlayerName(name);
 
   const roomRef = ref(db, `rooms/${STATE.roomId}`);
   const initialRoom = {
     status: 'LOBBY', host: STATE.playerId, targetLocation: '', winner: '', allLocations: [],
+    createdAt: Date.now(),
     players: { [STATE.playerId]: { name: STATE.playerName, isReady: false, role: '', location: '', votedFor: '', wantsToVote: false } },
     chat: {}
   };
@@ -498,9 +563,21 @@ function renderRoom(data) {
         me.role === 'สายลับ'
           ? '🔮 คุณกำลังจะประกาศตัว! เลือกสถานที่ให้ดีๆ...'
           : `🚨 "${data.spyRevealing}" ประกาศตัวเป็นสายลับแล้ว! กำลังทายสถานที่...`;
+
+      // Play sound notification when spy reveals (only on transition)
+      if (prevSpyRevealing !== data.spyRevealing && me.role !== 'สายลับ') {
+        playSpyAlertSound();
+      }
+
+      // Disable vote call button during spy announcement (Feature #6)
+      btnCallVote.disabled = true;
+      btnCallVote.innerHTML = `<span class="front-sec" style="background:rgba(255,255,255,0.05); color:var(--text-muted); border-color:var(--border-subtle); cursor:not-allowed;">🔒 สายลับกำลังประกาศ...</span>`;
     } else {
       banner.classList.add('hidden');
+      // Re-enable vote button when spy is not revealing
+      btnCallVote.disabled = false;
     }
+    prevSpyRevealing = data.spyRevealing || '';
   }
 
   if (data.status === 'VOTING') {
@@ -590,7 +667,7 @@ document.getElementById('btn-start').addEventListener('click', async () => {
     accompliceId = shuffledIds[1];
   }
 
-  let updates = { targetLocation: targetLoc, status: 'PLAYING', timerEnd: Date.now() + (8 * 60 * 1000), winner: '', allLocations: pool };
+  let updates = { targetLocation: targetLoc, status: 'PLAYING', timerEnd: Date.now() + (8 * 60 * 1000), winner: '', allLocations: pool, spyRevealing: '' };
 
   ids.forEach(id => {
     updates[`players/${id}/votedFor`] = '';
@@ -615,7 +692,17 @@ document.getElementById('btn-start').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-back-home').addEventListener('click', async () => {
-  if (STATE.isHost) await update(ref(db, `rooms/${STATE.roomId}`), { status: 'LOBBY' });
+  if (STATE.isHost) {
+    // Reset spyRevealing, wantsToVote, and votes when going back to lobby
+    const players = STATE.roomData.players;
+    const resetUpdates = { status: 'LOBBY', spyRevealing: '', winner: '' };
+    for (const id of Object.keys(players)) {
+      resetUpdates[`players/${id}/wantsToVote`] = false;
+      resetUpdates[`players/${id}/votedFor`] = '';
+      resetUpdates[`players/${id}/isReady`] = false;
+    }
+    await update(ref(db, `rooms/${STATE.roomId}`), resetUpdates);
+  }
 });
 
 async function doLeaveRoom() {
@@ -673,6 +760,8 @@ document.getElementById('btn-submit-vote').addEventListener('click', async () =>
 });
 
 document.getElementById('btn-call-vote').addEventListener('click', async () => {
+  // Block vote request during spy announcement
+  if (STATE.roomData?.spyRevealing) return;
   const currWantsToVote = STATE.roomData.players[STATE.playerId].wantsToVote;
   await update(ref(db, `rooms/${STATE.roomId}/players/${STATE.playerId}`), { wantsToVote: !currWantsToVote });
 });

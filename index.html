@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="โคตรสายลับ — เกม Spyfall ออนไลน์สำหรับกลุ่มผู้เล่น ค้นหาสายลับที่แฝงตัวอยู่ในกลุ่ม">
   <title>โคตรสายลับ — Spyfall Online</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -150,12 +150,6 @@
             placeholder="พิมพ์ชื่อเล่น..." maxlength="16" autocomplete="off">
         </div>
 
-        <button id="btn-create-room" class="pushable" style="margin-bottom:1.25rem;">
-          <span class="front">➕ สร้างห้องใหม่</span>
-        </button>
-
-        <div class="divider">หรือเข้าร่วมห้องที่มีอยู่</div>
-
         <!-- Room List Panel -->
         <div class="room-list-panel">
           <div class="room-list-header">
@@ -177,6 +171,12 @@
             <!-- Populated by JS -->
           </div>
         </div>
+
+        <div class="divider">หรือสร้างห้องใหม่</div>
+
+        <button id="btn-create-room" class="pushable">
+          <span class="front">➕ สร้างห้องใหม่</span>
+        </button>
 
       </div>
     </div>
