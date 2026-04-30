@@ -107,8 +107,13 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===== AUTO-CLOSE ROOMS (15 min) =====
+let cleanupIntervalId = null;
 function startRoomCleanupInterval() {
-  setInterval(async () => {
+  // Only run cleanup once, and only every 5 minutes to save battery
+  if (cleanupIntervalId) return;
+  cleanupIntervalId = setInterval(async () => {
+    // Only the host should clean up rooms
+    if (!STATE.isHost) return;
     try {
       const snapshot = await get(ref(db, 'rooms'));
       if (!snapshot.exists()) return;
@@ -124,7 +129,10 @@ function startRoomCleanupInterval() {
         }
       }
     } catch (e) { /* ignore cleanup errors */ }
-  }, 60 * 1000); // Check every 1 minute
+  }, 5 * 60 * 1000); // Check every 5 minutes (was 1 min — too aggressive for mobile)
+}
+function stopRoomCleanupInterval() {
+  if (cleanupIntervalId) { clearInterval(cleanupIntervalId); cleanupIntervalId = null; }
 }
 startRoomCleanupInterval();
 
@@ -855,10 +863,17 @@ document.getElementById('btn-send-chat').addEventListener('click', async (e) => 
   await set(push(ref(db, `rooms/${STATE.roomId}/chat`)), { sender: STATE.playerName, text: txt });
 });
 
+let lastChatKeysHash = '';
 function renderChat(chatObj) {
-  if (!chatObj) { document.getElementById('chat-messages').innerHTML = ''; return; }
+  if (!chatObj) { document.getElementById('chat-messages').innerHTML = ''; lastChatKeysHash = ''; return; }
+  // Optimization: skip if chat hasn't changed (avoids DOM rebuild on every Firebase tick)
+  const chatKeys = Object.keys(chatObj);
+  const newHash = chatKeys.join(',');
+  if (newHash === lastChatKeysHash) return;
+  lastChatKeysHash = newHash;
+
   let html = '';
-  for (let key in chatObj) {
+  for (let key of chatKeys) {
     let m = chatObj[key];
     if (m.isSystem) {
       html += `<div class="chat-msg system-msg">
@@ -876,9 +891,19 @@ function renderChat(chatObj) {
 }
 
 let timerInterval;
+let currentTimerEndTs = null; // Track to avoid re-creating interval unnecessarily
 function handleTimer(timerEndTs) {
+  // CRITICAL FIX: Only recreate the interval if timerEndTs actually changed
+  // Previously, every Firebase update would clear+recreate the interval (CPU hog on mobile)
+  if (!timerEndTs || STATE.roomData.status !== 'PLAYING') {
+    clearInterval(timerInterval);
+    currentTimerEndTs = null;
+    return;
+  }
+  if (currentTimerEndTs === timerEndTs) return; // Same timer, skip!
+  currentTimerEndTs = timerEndTs;
+
   clearInterval(timerInterval);
-  if (!timerEndTs || STATE.roomData.status !== 'PLAYING') return;
 
   const timerBar = document.getElementById('timer-bar-fill');
   const timerContainer = document.getElementById('display-timer');
@@ -903,6 +928,7 @@ function handleTimer(timerEndTs) {
 
     if (diff <= 0) {
       clearInterval(timerInterval);
+      currentTimerEndTs = null;
       document.getElementById('display-timer').innerText = "00:00";
       if (STATE.isHost) update(ref(db, `rooms/${STATE.roomId}`), { status: 'VOTING' });
     } else {

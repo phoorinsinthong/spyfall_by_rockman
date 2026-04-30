@@ -1055,6 +1055,8 @@ h1, h2, h3, h4 {
   filter: blur(80px);
   z-index: 0;
   pointer-events: none;
+  will-change: transform;
+  transform: translateZ(0); /* Force GPU layer for smoother compositing */
 }
 .decoration1 {
   width: 400px; height: 400px;
@@ -1073,6 +1075,54 @@ h1, h2, h3, h4 {
   background: rgba(6, 182, 212, 0.07);
   top: 40%; left: 60%;
   animation: float 18s ease-in-out infinite;
+}
+
+/* ===== MOBILE PERFORMANCE: Disable heavy GPU effects ===== */
+@media (max-width: 768px) {
+  /* Stop decoration blob animations on mobile — major GPU saver */
+  .decoration {
+    animation: none !important;
+    filter: blur(60px); /* Reduce blur radius */
+  }
+  .decoration3 {
+    display: none; /* Remove 3rd blob entirely on mobile */
+  }
+  /* Reduce backdrop-filter intensity on mobile */
+  .glass-panel {
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  }
+  /* Simplify body background on mobile */
+  body::after {
+    display: none; /* Remove grid pattern overlay — saves a composite layer */
+  }
+  /* Reduce modal backdrop blur on mobile */
+  .modal-overlay {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  /* Stop non-essential infinite animations */
+  .state-badge.playing {
+    animation: none;
+  }
+  .badge-ready {
+    animation: none;
+  }
+  .chat-dot {
+    animation: none;
+  }
+}
+
+/* Respect user's reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .decoration, .hero-icon, .bouncy-text, .rejoin-icon,
+  .badge-ready, .state-badge, .chat-dot, .spinner {
+    animation: none !important;
+  }
+  .glass-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 /* ===== MODALS ===== */
